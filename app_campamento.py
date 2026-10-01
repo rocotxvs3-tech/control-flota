@@ -9,11 +9,11 @@ import cloudinary.uploader
 # ---------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
-st.set_page_config(page_title="Insumos y Requerimientos de Campamento", layout="wide", page_icon="📦")
+st.set_page_config(page_title="Pedidos Franco Luna ➔ Carlos Vega", layout="wide", page_icon="📦")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Configuración de Cloudinary para fotos de remitos, repuestos o listas
+# Configuración de Cloudinary
 try:
     cloudinary.config(
         cloud_name=st.secrets["CLOUDINARY_CLOUD_NAME"],
@@ -24,27 +24,33 @@ try:
 except Exception:
     pass
 
-# Directorio de contactos y grupos predefinidos
-CONTACTOS_WHATSAPP = {
-    "🛠️ Franco Luna (388517891)": "549388517891",
-    "👤 Carlos Vega (3886509152)": "5493886509152",
-    "👥 Elegir Grupo de WhatsApp": "GRUPO",
-    "📱 OTRO NÚMERO MANUAL": "OTRO"
-}
+# Teléfono directo de Carlos Vega
+TEL_CARLOS_VEGA = "5493886509152"
 
-# Unidades / Áreas de la mina
 unidades_list = [
     "General / Campamento Base",
     "Taller / Mantenimiento",
+    "MB Actros - AG506KW",
+    "MB Actros - AB020RG",
+    "MB Actros - AB032RM",
+    "Iveco - AG096CP",
+    "Iveco - AC737ZZ",
+    "Tolva Randon - AF720XG",
+    "Tolva Randon - AC738FC",
+    "Tolva Randon - LBZ158",
+    "Batea Randon - AC738HC",
+    "Sola y Brusa - AC116DF",
+    "Pala Cargadora",
+    "Excavadora",
     "Otro Destino"
 ]
 
-st.title("📦 Requerimientos de Materiales e Insumos - Campamento Mina")
-st.markdown("Lista directa de elementos solicitados para enviar al encargado o grupo.")
+st.title("📦 Envío de Pedidos: Franco Luna ➔ Carlos Vega")
+st.markdown("Plataforma de emisión, envío por WhatsApp y confirmación de recepción de insumos.")
 
 menu = st.sidebar.radio("Navegación:", [
-    "📝 Crear Lista de Elementos", 
-    "📊 Historial y Estado de Pedidos"
+    "📝 Enviar Nuevo Pedido a Carlos Vega", 
+    "📊 Historial y Confirmaciones de Recepción"
 ])
 
 def subir_foto(file_buffer):
@@ -57,19 +63,19 @@ def subir_foto(file_buffer):
     return ""
 
 # ---------------------------------------------------------
-# OPCIÓN 1: CREAR LISTA DE ELEMENTOS
+# OPCIÓN 1: ENVIAR NUEVO PEDIDO A CARLOS VEGA
 # ---------------------------------------------------------
-if menu == "📝 Crear Lista de Elementos":
-    st.subheader("📋 Cargar Lista de Elementos Necesarios")
+if menu == "📝 Enviar Nuevo Pedido a Carlos Vega":
+    st.subheader("📋 Detalle del Pedido de Insumos")
     
     col1, col2 = st.columns(2)
     
     with col1:
+        emisor = st.text_input("Emisor del Pedido:", value="Franco Luna", disabled=True)
+        destinatario = st.text_input("Destinatario:", value="Carlos Vega (3886509152)", disabled=True)
+        
         destino = st.selectbox("Equipo / Área de Destino:", unidades_list, key="camp_destino")
-        if destino == "Otro Destino":
-            destino_real = st.text_input("Especifique Destino:", key="camp_dest_otro")
-        else:
-            destino_real = destino
+        destino_real = st.text_input("Especifique Destino:", key="camp_dest_otro") if destino == "Otro Destino" else destino
 
         categoria = st.selectbox("Categoría de Insumos:", [
             "🛠️ Herramientas y Repuestos",
@@ -84,44 +90,24 @@ if menu == "📝 Crear Lista de Elementos":
     with col2:
         elementos = st.text_area(
             "Lista detallada de elementos requeridos:",
-            placeholder="Escriba un elemento por línea. Ej:\n- 2 Filtros de aceite\n- 1 Juego de llaves combinadas\n- 5 Cajas de electrodos\n- 20 Lts de Refrigerante",
-            height=140,
+            placeholder="Escriba un elemento por línea:\n- 2 Filtros de aceite\n- 1 Juego de llaves combinadas\n- 20 Lts de Refrigerante",
+            height=160,
             key="camp_elementos"
         )
         
-        obs = st.text_input("Observaciones o aclaración corta:", placeholder="ej: Entregar antes del viernes", key="camp_obs")
-        
-        # Seleccionar destinatario o grupo de WhatsApp
-        destinatario_sel = st.selectbox(
-            "Enviar WhatsApp a:",
-            list(CONTACTOS_WHATSAPP.keys()),
-            key="camp_destinatario"
-        )
-        
-        val_contacto = CONTACTOS_WHATSAPP[destinatario_sel]
-        
-        if val_contacto == "OTRO":
-            num_manual = st.text_input("Ingrese número con código de área (ej: 3885123456):", key="camp_num_manual")
-            num_limpio = str(num_manual).replace("+", "").replace(" ", "").replace("-", "").strip()
-            if num_limpio.startswith("0"):
-                num_limpio = num_limpio[1:]
-            if num_limpio and not num_limpio.startswith("549"):
-                num_limpio = "549" + num_limpio
-            telefono_destino = num_limpio
-        else:
-            telefono_destino = val_contacto
+        obs = st.text_input("Observaciones o aclaración corta:", placeholder="ej: Necesario para la subida del viernes", key="camp_obs")
 
-    st.markdown("### 📷 Adjuntar foto de pieza, muestra o lista manuscrita (Opcional)")
+    st.markdown("### 📷 Adjuntar foto de pieza, lista manuscrita o muestra (Opcional)")
     foto_file = st.file_uploader("Seleccionar imagen:", type=["jpg", "png", "jpeg"], key="camp_foto")
 
     st.divider()
-    btn_guardar = st.button("💾 GUARDAR LISTA Y ARMAR MENSAJE", type="primary", use_container_width=True)
+    btn_guardar = st.button("💾 REGISTRAR PEDIDO Y ENVIAR A CARLOS VEGA", type="primary", use_container_width=True)
 
     if btn_guardar:
         if not elementos or elementos.strip() == "":
             st.warning("⚠️ Debe ingresar al menos un elemento en la lista.")
         else:
-            with st.spinner("Guardando registro de materiales..."):
+            with st.spinner("Guardando pedido en planilla y armando mensaje..."):
                 url_foto = subir_foto(foto_file) if foto_file else ""
                 
                 try:
@@ -131,11 +117,13 @@ if menu == "📝 Crear Lista de Elementos":
 
                 nueva_fila = pd.DataFrame([{
                     "Fecha Registro": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "Emisor": "Franco Luna",
+                    "Destinatario": "Carlos Vega",
                     "Unidad / Destino": destino_real,
                     "Categoría": categoria,
                     "Lista de Elementos Requeridos": elementos,
                     "Prioridad": prioridad,
-                    "Estado": "⏳ Pendiente",
+                    "Estado Confirmación": "⏳ Pendiente de Confirmación",
                     "Foto Evidencia": url_foto if url_foto else "Sin foto",
                     "Observaciones": obs
                 }])
@@ -143,11 +131,13 @@ if menu == "📝 Crear Lista de Elementos":
                 df_actualizado = pd.concat([df_exist, nueva_fila], ignore_index=True)
                 conn.update(worksheet="Pedidos_Campamento", data=df_actualizado)
 
-                st.success("✅ Lista de elementos registrada con éxito.")
+                st.success("✅ Pedido registrado con éxito en la base de datos.")
 
-                # Armar mensaje estructurado para WhatsApp
+                # Mensaje con solicitud explicita de confirmación para Carlos Vega
                 texto_wa = (
-                    f"📦 *REQUERIMIENTO DE ELEMENTOS - CAMPAMENTO*\n\n"
+                    f"📦 *NUEVO PEDIDO DE INSUMOS*\n"
+                    f"👤 *De:* Franco Luna\n"
+                    f"👤 *Para:* Carlos Vega\n\n"
                     f"📍 *Destino/Equipo:* {destino_real}\n"
                     f"🏷️ *Categoría:* {categoria}\n"
                     f"⚠️ *Prioridad:* {prioridad}\n\n"
@@ -155,37 +145,22 @@ if menu == "📝 Crear Lista de Elementos":
                     f"📝 *Obs:* {obs if obs else 'Sin observaciones'}\n"
                 )
                 if url_foto:
-                    texto_wa += f"📷 *Foto muestra/lista:* {url_foto}"
+                    texto_wa += f"📷 *Foto Muestra:* {url_foto}\n\n"
+                
+                texto_wa += "📲 *Por favor responde este mensaje confirmando la recepción.*"
 
                 texto_encoded = urllib.parse.quote(texto_wa)
-                
-                # Generar URL según si es un número directo o un grupo
-                if telefono_destino == "GRUPO":
-                    wa_url = f"https://api.whatsapp.com/send?text={texto_encoded}"
-                    etiqueta_boton = "📲 ABRIR WHATSAPP Y ELEGIR GRUPO PARA ENVIAR"
-                else:
-                    wa_url = f"https://api.whatsapp.com/send?phone={telefono_destino}&text={texto_encoded}"
-                    etiqueta_boton = f"📲 ENVIAR LISTA A {destinatario_sel.upper()} POR WHATSAPP"
+                wa_url = f"https://api.whatsapp.com/send?phone={TEL_CARLOS_VEGA}&text={texto_encoded}"
 
                 st.markdown("---")
-                st.subheader("📲 Enviar Lista por WhatsApp")
-                st.link_button(
-                    etiqueta_boton, 
-                    wa_url, 
-                    use_container_width=True, 
-                    type="primary"
-                )
-                
-                if telefono_destino == "GRUPO":
-                    st.caption("💡 *Nota: Se abrirá WhatsApp para que selecciones tu grupo de trabajo. El mensaje ya estará escrito listo para presionar enviar.*")
-                else:
-                    st.caption("💡 *Nota: Al presionar el botón se abrirá WhatsApp con el mensaje cargado. Solo debes tocar Enviar dentro de la aplicación.*")
+                st.subheader("📲 Enviar a Carlos Vega por WhatsApp")
+                st.link_button("📲 ENVIAR PEDIDO A CARLOS VEGA (3886509152)", wa_url, use_container_width=True, type="primary")
 
 # ---------------------------------------------------------
-# OPCIÓN 2: HISTORIAL Y ESTADO DE PEDIDOS
+# OPCIÓN 2: HISTORIAL Y ESTADO DE CONFIRMACIONES
 # ---------------------------------------------------------
 else:
-    st.subheader("📊 Historial de Materiales e Insumos Pedidos")
+    st.subheader("📊 Control de Pedidos y Confirmaciones (Franco Luna ➔ Carlos Vega)")
 
     if st.button("🔄 Actualizar Registro"):
         st.cache_data.clear()
@@ -195,21 +170,61 @@ else:
         df_pedidos = conn.read(worksheet="Pedidos_Campamento", ttl=0)
 
         if df_pedidos.empty:
-            st.info("No hay listas de elementos registradas aún.")
+            st.info("No hay pedidos registrados aún.")
         else:
-            estado_filtro = st.selectbox("Filtrar por Estado:", ["Todos", "⏳ Pendiente", "📦 En Preparación", "✅ Listo / Entregado"])
+            # Filtro por estado de confirmación
+            estados_posibles = [
+                "Todos", 
+                "⏳ Pendiente de Confirmación", 
+                "👍 Confirmado por Carlos Vega", 
+                "📦 En Preparación / Armado", 
+                "✅ Entregado / Recibido"
+            ]
             
-            df_mostrar = df_pedidos if estado_filtro == "Todos" else df_pedidos[df_pedidos["Estado"] == estado_filtro]
+            estado_filtro = st.selectbox("Filtrar por Estado de Confirmación:", estados_posibles)
+            
+            col_est = "Estado Confirmación" if "Estado Confirmación" in df_pedidos.columns else "Estado"
+            df_mostrar = df_pedidos if estado_filtro == "Todos" else df_pedidos[df_pedidos[col_est] == estado_filtro]
 
             st.markdown("---")
             for idx, row in df_mostrar.iloc[::-1].iterrows():
-                with st.expander(f"📦 {row['Fecha Registro']} - {row['Unidad / Destino']} ({row['Prioridad']})"):
+                emisor_val = row.get("Emisor", "Franco Luna")
+                dest_val = row.get("Destinatario", "Carlos Vega")
+                estado_actual = str(row.get(col_est, "⏳ Pendiente de Confirmación"))
+
+                with st.expander(f"📦 {row['Fecha Registro']} | {emisor_val} ➔ {dest_val} | Destino: {row['Unidad / Destino']} [{estado_actual}]"):
                     c1, c2 = st.columns([2, 1])
                     with c1:
-                        st.markdown(f"**Categoría:** {row['Categoría']}")
+                        st.markdown(f"**Categoría:** {row['Categoría']} | **Prioridad:** {row['Prioridad']}")
                         st.markdown(f"**Elementos Requeridos:**\n{row['Lista de Elementos Requeridos']}")
-                        st.markdown(f"**Estado:** `{row['Estado']}`")
                         st.markdown(f"**Observaciones:** {row['Observaciones']}")
+                        
+                        st.markdown("---")
+                        st.markdown("##### ⚙️ Actualizar Confirmación de Recepción/Entrega")
+                        
+                        lista_confirmaciones = [
+                            "⏳ Pendiente de Confirmación", 
+                            "👍 Confirmado por Carlos Vega", 
+                            "📦 En Preparación / Armado", 
+                            "✅ Entregado / Recibido"
+                        ]
+                        
+                        idx_def = lista_confirmaciones.index(estado_actual) if estado_actual in lista_confirmaciones else 0
+                        
+                        nuevo_estado = st.selectbox(
+                            "Estado de confirmación:", 
+                            lista_confirmaciones, 
+                            index=idx_def, 
+                            key=f"sel_conf_{idx}"
+                        )
+                        
+                        if st.button("💾 Actualizar Estado de Confirmación", key=f"btn_conf_{idx}"):
+                            df_pedidos.at[idx, col_est] = nuevo_estado
+                            conn.update(worksheet="Pedidos_Campamento", data=df_pedidos)
+                            st.success(f"✅ Estado actualizado a: {nuevo_estado}")
+                            st.cache_data.clear()
+                            st.rerun()
+
                     with c2:
                         foto_url = str(row.get("Foto Evidencia", "")).strip()
                         if foto_url.startswith("http"):
