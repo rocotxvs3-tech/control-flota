@@ -9,20 +9,25 @@ st.set_page_config(page_title="Control de Neumáticos - Flota", layout="wide", p
 # Conexión con Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Definición de la Flota (Tractores y Tolvas)
+# Definición de la Flota (Tractores / Camiones)
 tractores = {
     "AG506KW": "MB Actros",
     "AB020RG": "MB 1735",
-    "AB032RM": "MB 1735"
+    "AB032RM": "MB 1735",
+    "AG096CP": "Iveco",
+    "AC737ZZ": "Iveco Tector"
 }
 
-tolvas = {
+# Definición de Semirremolques (Tolvas, Bateas y Semis)
+semis = {
     "AF720XG": "RANDON SemiTolva 1",
     "AC738FC": "RANDON SemiTolva 2",
-    "LBZ158": "RANDON SemiTolva 3"
+    "LBZ158": "RANDON SemiTolva 3",
+    "AC738HC": "RANDON Batea",
+    "AC116DF": "Sola y Brusa Semi"
 }
 
-# Posiciones según el tipo de unidad
+# Posiciones de gomas por tipo de unidad
 posiciones_tractor = [
     "Eje 1 - Dirección Izquierda", "Eje 1 - Dirección Derecha",
     "Eje 2 - Tracción Izquierda Externa", "Eje 2 - Tracción Izquierda Interna",
@@ -30,14 +35,14 @@ posiciones_tractor = [
     "Auxilio / Repuesto Tractor"
 ]
 
-posiciones_tolva = [
+posiciones_semi = [
     "Eje 1 - Izquierda Externa", "Eje 1 - Izquierda Interna",
     "Eje 1 - Derecha Externa", "Eje 1 - Derecha Interna",
     "Eje 2 - Izquierda Externa", "Eje 2 - Izquierda Interna",
     "Eje 2 - Derecha Externa", "Eje 2 - Derecha Interna",
     "Eje 3 - Izquierda Externa", "Eje 3 - Izquierda Interna",
     "Eje 3 - Derecha Externa", "Eje 3 - Derecha Interna",
-    "Auxilio / Repuesto Tolva"
+    "Auxilio / Repuesto Semirremolque"
 ]
 
 st.title("🛞 Sistema de Control e Inspección de Neumáticos")
@@ -52,18 +57,18 @@ menu = st.sidebar.radio("Navegación:", ["📝 Inspección / Carga", "📊 Histo
 if menu == "📝 Inspección / Carga":
     st.subheader("📋 Registro de Medición de Neumático")
     
-    tipo_vehiculo = st.radio("Selecciona el tipo de unidad:", ["Tractocamión (Mercedes Benz)", "SemiTolva (RANDON)"], horizontal=True)
+    tipo_vehiculo = st.radio("Selecciona el tipo de unidad:", ["Tractocamión / Camión", "Semirremolque / Batea / Tolva"], horizontal=True)
     
     col_sel1, col_sel2 = st.columns(2)
     with col_sel1:
-        if tipo_vehiculo == "Tractocamión (Mercedes Benz)":
-            patente_sel = st.selectbox("Patente del Tractor", list(tractores.keys()))
+        if tipo_vehiculo == "Tractocamión / Camión":
+            patente_sel = st.selectbox("Patente del Camión / Tractor", list(tractores.keys()))
             vehiculo_str = f"{tractores[patente_sel]} ({patente_sel})"
             posiciones_disponibles = posiciones_tractor
         else:
-            patente_sel = st.selectbox("Patente de la SemiTolva", list(tolvas.keys()))
-            vehiculo_str = f"{tolvas[patente_sel]} ({patente_sel})"
-            posiciones_disponibles = posiciones_tolva
+            patente_sel = st.selectbox("Patente del Semirremolque / Batea / Tolva", list(semis.keys()))
+            vehiculo_str = f"{semis[patente_sel]} ({patente_sel})"
+            posiciones_disponibles = posiciones_semi
 
     with col_sel2:
         posicion_sel = st.selectbox("Posición / Ubicación de la Goma", posiciones_disponibles)
@@ -121,7 +126,7 @@ if menu == "📝 Inspección / Carga":
                 
                 df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
                 conn.update(worksheet="Control_Gomas", data=df_actualizado)
-                st.success(f"✅ ¡Registro de neumático ({num_serie}) guardado exitosamente!")
+                st.success(f"✅ ¡Registro de neumático ({num_serie}) en {patente_sel} guardado exitosamente!")
 
 # ---------------------------------------------------------
 # OPCIÓN 2: HISTORIAL Y DESCARGA DE EXCEL
