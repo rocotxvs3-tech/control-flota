@@ -30,8 +30,8 @@ except Exception:
 unidades_list = [
     # Tractocamiones
     "MB Actros - AG506KW",
-    "MB Actros - AB020RG",
-    "MB Actros - AB032RM",
+    "MB 1735 - AB020RG",
+    "MB 1735 - AB032RM",
     "Iveco - AG096CP",
     "Iveco - AC737ZZ",
     # Semirremolques, Tolvas y Bateas
