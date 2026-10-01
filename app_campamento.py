@@ -7,7 +7,7 @@ import cloudinary
 import cloudinary.uploader
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN
+# CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(page_title="Insumos y Requerimientos de Campamento", layout="wide", page_icon="📦")
 
@@ -24,6 +24,14 @@ try:
 except Exception:
     pass
 
+# Directorio de contactos y grupos predefinidos
+CONTACTOS_WHATSAPP = {
+    "🛠️ Franco Luna (388517891)": "549388517891",
+    "👤 Carlos Vega (3886509152)": "5493886509152",
+    "👥 Elegir Grupo de WhatsApp": "GRUPO",
+    "📱 OTRO NÚMERO MANUAL": "OTRO"
+}
+
 # Unidades / Áreas de la mina
 unidades_list = [
     "General / Campamento Base",
@@ -32,7 +40,7 @@ unidades_list = [
 ]
 
 st.title("📦 Requerimientos de Materiales e Insumos - Campamento Mina")
-st.markdown("Lista directa de elementos solicitados para enviar al encargado.")
+st.markdown("Lista directa de elementos solicitados para enviar al encargado o grupo.")
 
 menu = st.sidebar.radio("Navegación:", [
     "📝 Crear Lista de Elementos", 
@@ -77,12 +85,31 @@ if menu == "📝 Crear Lista de Elementos":
         elementos = st.text_area(
             "Lista detallada de elementos requeridos:",
             placeholder="Escriba un elemento por línea. Ej:\n- 2 Filtros de aceite\n- 1 Juego de llaves combinadas\n- 5 Cajas de electrodos\n- 20 Lts de Refrigerante",
-            height=160,
+            height=140,
             key="camp_elementos"
         )
         
         obs = st.text_input("Observaciones o aclaración corta:", placeholder="ej: Entregar antes del viernes", key="camp_obs")
-        telefono_encargado = st.text_input("Teléfono WhatsApp Encargado (con código de país/área):", placeholder="ej: 5492641234567", key="camp_tel")
+        
+        # Seleccionar destinatario o grupo de WhatsApp
+        destinatario_sel = st.selectbox(
+            "Enviar WhatsApp a:",
+            list(CONTACTOS_WHATSAPP.keys()),
+            key="camp_destinatario"
+        )
+        
+        val_contacto = CONTACTOS_WHATSAPP[destinatario_sel]
+        
+        if val_contacto == "OTRO":
+            num_manual = st.text_input("Ingrese número con código de área (ej: 3885123456):", key="camp_num_manual")
+            num_limpio = str(num_manual).replace("+", "").replace(" ", "").replace("-", "").strip()
+            if num_limpio.startswith("0"):
+                num_limpio = num_limpio[1:]
+            if num_limpio and not num_limpio.startswith("549"):
+                num_limpio = "549" + num_limpio
+            telefono_destino = num_limpio
+        else:
+            telefono_destino = val_contacto
 
     st.markdown("### 📷 Adjuntar foto de pieza, muestra o lista manuscrita (Opcional)")
     foto_file = st.file_uploader("Seleccionar imagen:", type=["jpg", "png", "jpeg"], key="camp_foto")
@@ -118,7 +145,7 @@ if menu == "📝 Crear Lista de Elementos":
 
                 st.success("✅ Lista de elementos registrada con éxito.")
 
-                # Armar mensaje para enviar al encargado
+                # Armar mensaje estructurado para WhatsApp
                 texto_wa = (
                     f"📦 *REQUERIMIENTO DE ELEMENTOS - CAMPAMENTO*\n\n"
                     f"📍 *Destino/Equipo:* {destino_real}\n"
@@ -131,13 +158,28 @@ if menu == "📝 Crear Lista de Elementos":
                     texto_wa += f"📷 *Foto muestra/lista:* {url_foto}"
 
                 texto_encoded = urllib.parse.quote(texto_wa)
-                num_tel = telefono_encargado.replace("+", "").replace(" ", "").strip()
                 
-                wa_url = f"https://wa.me/{num_tel}?text={texto_encoded}" if num_tel else f"https://wa.me/?text={texto_encoded}"
+                # Generar URL según si es un número directo o un grupo
+                if telefono_destino == "GRUPO":
+                    wa_url = f"https://api.whatsapp.com/send?text={texto_encoded}"
+                    etiqueta_boton = "📲 ABRIR WHATSAPP Y ELEGIR GRUPO PARA ENVIAR"
+                else:
+                    wa_url = f"https://api.whatsapp.com/send?phone={telefono_destino}&text={texto_encoded}"
+                    etiqueta_boton = f"📲 ENVIAR LISTA A {destinatario_sel.upper()} POR WHATSAPP"
 
                 st.markdown("---")
                 st.subheader("📲 Enviar Lista por WhatsApp")
-                st.link_button("📲 ENVIAR LISTA AL ENCARGADO POR WHATSAPP", wa_url, use_container_width=True, type="primary")
+                st.link_button(
+                    etiqueta_boton, 
+                    wa_url, 
+                    use_container_width=True, 
+                    type="primary"
+                )
+                
+                if telefono_destino == "GRUPO":
+                    st.caption("💡 *Nota: Se abrirá WhatsApp para que selecciones tu grupo de trabajo. El mensaje ya estará escrito listo para presionar enviar.*")
+                else:
+                    st.caption("💡 *Nota: Al presionar el botón se abrirá WhatsApp con el mensaje cargado. Solo debes tocar Enviar dentro de la aplicación.*")
 
 # ---------------------------------------------------------
 # OPCIÓN 2: HISTORIAL Y ESTADO DE PEDIDOS
