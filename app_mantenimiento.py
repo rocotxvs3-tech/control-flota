@@ -11,7 +11,7 @@ import io
 # CONFIGURACIÓN E ID DE CARPETA DE GOOGLE DRIVE
 # ---------------------------------------------------------
 # ⚠️ Reemplaza este valor con el ID real de tu carpeta de Google Drive
-FOLDER_ID_DRIVE = "COLOCA_AQUI_EL_ID_DE_TU_CARPETA_DE_DRIVE"
+FOLDER_ID_DRIVE = "10mDc_yCVjz1d4t9Uw8Qw92chwF6LrJ-U"
 
 st.set_page_config(page_title="Mantenimiento y Fotos HD (Drive)", layout="wide", page_icon="🛠️")
 
