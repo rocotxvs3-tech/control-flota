@@ -22,14 +22,28 @@ try:
         secure = True
     )
 except Exception:
-    st.warning("⚠️ Asegúrate de agregar las credenciales de Cloudinary en Secrets.")
+    st.warning("⚠️ Asegúrate de agregar las credenciales de Cloudinary en los Secrets de Streamlit.")
 
+# ---------------------------------------------------------
+# LISTA OFICIAL DE VEHÍCULOS Y EQUIPOS DE LA FLOTA
+# ---------------------------------------------------------
 unidades_list = [
-    "Camión 01 - Mercedes Benz",
-    "Camión 02 - Scania",
-    "Camión 03 - Volvo",
+    # Tractocamiones
+    "MB Actros - AG506KW",
+    "MB Actros - AB020RG",
+    "MB Actros - AB032RM",
+    "Iveco - AG096CP",
+    "Iveco - AC737ZZ",
+    # Semirremolques, Tolvas y Bateas
+    "Tolva Randon - AF720XG",
+    "Tolva Randon - AC738FC",
+    "Tolva Randon - LBZ158",
+    "Batea Randon - AC738HC",
+    "Sola y Brusa - AC116DF",
+    # Maquinarias y Taller
     "Pala Cargadora",
     "Excavadora",
+    "General / Taller Base",
     "Otra Unidad"
 ]
 
@@ -47,7 +61,7 @@ def subir_foto_alta_resolucion(file_buffer):
             respuesta = cloudinary.uploader.upload(
                 file_buffer,
                 folder="mantenimientos_flota",
-                quality="auto:good"  # Optimiza la descarga reteniendo máxima nitidez
+                quality="auto:good"
             )
             return respuesta.get("secure_url", "")
         except Exception as e:
@@ -59,13 +73,13 @@ def subir_foto_alta_resolucion(file_buffer):
 # OPCIÓN 1: REGISTRAR MANTENIMIENTO CON FOTO HD
 # ---------------------------------------------------------
 if menu == "📸 Registrar Mantenimiento / Foto HD":
-    st.subheader("📝 Nuevo Registro con Foto HD (Cloudinary)")
+    st.subheader("📝 Nuevo Registro con Foto HD")
 
     col1, col2 = st.columns(2)
     
     with col1:
         fecha = st.date_input("Fecha del Trabajo", value=datetime.now().date(), key="mant_fecha")
-        unidad_sel = st.selectbox("Unidad / Camión / Máquina", unidades_list, key="mant_unidad_sel")
+        unidad_sel = st.selectbox("Unidad / Camión / Equipo", unidades_list, key="mant_unidad_sel")
         unidad = st.text_input("Especifique Unidad", key="mant_unidad_otra") if unidad_sel == "Otra Unidad" else unidad_sel
         
         tipo_trabajo = st.selectbox("Tipo de Mantenimiento", [
@@ -80,13 +94,19 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
         km_horas = st.number_input("Kilometraje / Horas", min_value=0, value=100000, step=500, key="mant_km")
         
     with col2:
-        mecanico = st.selectbox("Mecánico / Responsable", ["Rocho (Mecánico)", "Daniel (Mecánico)", "Taller Externo", "Otro"], key="mant_mecanico")
-        repuestos_usados = st.text_input("Repuestos Utilizados", key="mant_repuestos")
-        costo = st.number_input("Costo ($)", min_value=0.0, value=0.0, step=100.0, key="mant_costo")
-        obs = st.text_area("Observaciones", key="mant_obs")
+        mecanico = st.selectbox("Mecánico / Responsable", [
+            "Rocho (Mecánico)", 
+            "Daniel (Mecánico)", 
+            "Taller Externo", 
+            "Otro"
+        ], key="mant_mecanico")
+        
+        repuestos_usados = st.text_input("Repuestos Utilizados", placeholder="ej: Filtro Mann, Aceite 15W40, etc.", key="mant_repuestos")
+        costo = st.number_input("Costo Aproximado ($)", min_value=0.0, value=0.0, step=100.0, key="mant_costo")
+        obs = st.text_area("Observaciones del trabajo", placeholder="Detalle del trabajo o causa de reemplazo...", key="mant_obs")
 
     st.divider()
-    st.markdown("### 📷 Captura / Carga de Foto HD")
+    st.markdown("### 📷 Captura / Carga de Foto Evidencia HD")
     
     opcion_foto = st.radio("Cargar foto desde:", ["📷 Cámara del Celular", "📁 Archivos / Galería"], horizontal=True, key="mant_metodo")
     
@@ -101,11 +121,17 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
     
     if btn_guardar:
         if not unidad or unidad.strip() == "":
-            st.error("⚠️ Debe especificar la unidad o camión.")
+            st.error("⚠️ Debe especificar la unidad o equipo.")
         else:
-            with st.spinner("Subiendo foto en alta resolución a la nube..."):
+            with st.spinner("Subiendo foto en alta resolución y guardando en planilla..."):
                 url_foto_hd = subir_foto_alta_resolucion(foto_capturada) if foto_capturada else ""
                 
+                # Formato de enlace limpio para Google Sheets
+                if url_foto_hd:
+                    enlace_sheets = f'=HYPERLINK("{url_foto_hd}"; "📷 Ver Foto {unidad}")'
+                else:
+                    enlace_sheets = "Sin foto"
+
                 try:
                     df_existente = conn.read(worksheet="Mantenimientos_Fotos", ttl=0)
                 except Exception:
@@ -118,7 +144,7 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
                     "Kilometraje/Horas": km_horas,
                     "Repuestos Utilizados": repuestos_usados,
                     "Mecánico/Responsable": mecanico,
-                    "Foto Evidencia": url_foto_hd,  # Se guarda el enlace directo HD en Google Sheets
+                    "Foto Evidencia": enlace_sheets,  # Enlace formateado amigable para Google Sheets
                     "Costo Aprox": costo,
                     "Observaciones": obs
                 }])
@@ -126,7 +152,7 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
                 df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
                 conn.update(worksheet="Mantenimientos_Fotos", data=df_actualizado)
                 
-                st.success("✅ ¡Mantenimiento guardado correctamente con foto en alta resolución!")
+                st.success(f"✅ ¡Mantenimiento de **{unidad}** guardado con éxito con su foto en alta resolución!")
 
 # ---------------------------------------------------------
 # OPCIÓN 2: HISTORIAL Y VISUALIZADOR DE FOTOS
@@ -162,11 +188,21 @@ else:
                         st.markdown(f"**Observaciones:** {row['Observaciones']}")
                         
                     with c2:
-                        url_foto = row.get("Foto Evidencia", "")
-                        if pd.notna(url_foto) and str(url_foto).startswith("http"):
+                        raw_foto = str(row.get("Foto Evidencia", ""))
+                        
+                        # Extraer URL si viene en formato =HYPERLINK("url"; "texto")
+                        url_foto = raw_foto
+                        if 'HYPERLINK("' in raw_foto:
+                            try:
+                                url_foto = raw_foto.split('HYPERLINK("')[1].split('"')[0]
+                            except Exception:
+                                url_foto = raw_foto
+
+                        if pd.notna(url_foto) and url_foto.startswith("http"):
                             st.image(url_foto, caption=f"Foto HD ({row['Unidad']})", use_container_width=True)
+                            st.link_button("🔎 Ampliar / Descargar Foto HD", url_foto, use_container_width=True)
                         else:
-                            st.info("Sin foto adjunta")
+                            st.info("📷 Sin foto adjunta")
 
     except Exception as e:
-        st.info("Asegúrate de haber creado la pestaña 'Mantenimientos_Fotos' en tu Google Sheet.")
+        st.info("Asegúrate de haber creado la pestaña 'Mantenimientos_Fotos' en tu archivo de Google Sheets.")
