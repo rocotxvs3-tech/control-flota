@@ -27,71 +27,91 @@ st.markdown("Carga de servicios realizados con **evidencia fotográfica** (Cáma
 
 menu = st.sidebar.radio("Navegación:", ["📸 Registrar Mantenimiento / Foto", "📊 Historial y Comprobantes"])
 
-# Función para convertir imagen a Base64 (para guardar en la celda del Sheet)
+# Función para convertir imagen a Base64
 def convertir_imagen_a_base64(uploaded_file):
     if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        # Redimensionar si es muy grande para optimizar espacio
-        image.thumbnail((800, 800))
-        buffered = io.BytesIO()
-        image.save(buffered, format="JPEG", quality=70)
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-        return f"data:image/jpeg;base64,{img_str}"
+        try:
+            image = Image.open(uploaded_file)
+            image.thumbnail((800, 800))  # Redimensionar para optimizar peso
+            buffered = io.BytesIO()
+            image.save(buffered, format="JPEG", quality=70)
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return f"data:image/jpeg;base64,{img_str}"
+        except Exception as e:
+            st.error(f"Error al procesar la imagen: {e}")
+            return ""
     return ""
 
+# Función para limpiar campos al terminar
+def limpiar_formulario():
+    keys_a_limpiar = [
+        "mant_unidad_otra", "mant_repuestos", "mant_costo", 
+        "mant_obs", "mant_foto_cam", "mant_foto_file"
+    ]
+    for key in keys_a_limpiar:
+        if key in st.session_state:
+            del st.session_state[key]
+
 # ---------------------------------------------------------
-# OPCIÓN 1: REGISTRAR MANTENIMIENTO CON FOTO
+# OPCIÓN 1: REGISTRAR MANTENIMIENTO CON FOTO (MEMORIA ACTIVA)
 # ---------------------------------------------------------
 if menu == "📸 Registrar Mantenimiento / Foto":
     st.subheader("📝 Nuevo Registro de Mantenimiento o Cambio de Repuesto")
+    st.caption("💡 Nota: Puedes escribir los datos y sacar la foto en el orden que quieras, **no se borrará nada**.")
+
+    col1, col2 = st.columns(2)
     
-    with st.form("form_mantenimiento", clear_on_submit=True):
-        col1, col2 = st.columns(2)
+    with col1:
+        fecha = st.date_input("Fecha del Trabajo", value=datetime.now().date(), key="mant_fecha")
+        unidad_sel = st.selectbox("Unidad / Camión / Máquina", unidades_list, key="mant_unidad_sel")
         
-        with col1:
-            fecha = st.date_input("Fecha del Trabajo", value=datetime.now().date())
-            unidad_sel = st.selectbox("Unidad / Camión / Máquina", unidades_list)
-            unidad = st.text_input("Especifique Unidad") if unidad_sel == "Otra Unidad" else unidad_sel
-            
-            tipo_trabajo = st.selectbox("Tipo de Mantenimiento / Cambio", [
-                "🛢️ Cambio de Aceite y Filtros",
-                "🔩 Cambio de Repuesto / Pieza Rota",
-                "🛞 Servicio de Neumáticos / Alineación",
-                "⚡ Reparación Eléctrica",
-                "🔨 Mantenimiento General / Taller",
-                "🧾 Comprobante / Factura de Compra"
-            ])
-            
-            km_horas = st.number_input("Kilometraje actual u Horas de Motor", min_value=0, value=100000, step=500)
-            
-        with col2:
-            mecanico = st.selectbox("Mecánico / Responsable", [
-                "Rocho (Mecánico)",
-                "Daniel (Mecánico)",
-                "Taller Externo",
-                "Otro"
-            ])
-            repuestos_usados = st.text_input("Repuestos o Insumos Utilizados", placeholder="ej: Filtro Mann W950, Aceite 15W40 20L, etc.")
-            costo = st.number_input("Costo Aproximado / Factura ($)", min_value=0.0, value=0.0, step=100.0)
-            obs = st.text_area("Detalle / Observaciones del trabajo realizado", placeholder="Describa el estado de la pieza reemplazada o el motivo del cambio...")
-
-        st.divider()
-        st.markdown("### 📷 Adjuntar Foto / Evidencia Fotográfica")
-        
-        opcion_foto = st.radio("Método para cargar la foto:", ["📷 Sacar foto ahora (Cámara Celular/Webcam)", "📁 Cargar desde la Galería/Archivos"], horizontal=True)
-        
-        foto_capturada = None
-        if "Cámara" in opcion_foto:
-            foto_capturada = st.camera_input("Toma la foto del repuesto cambiado o factura:")
+        if unidad_sel == "Otra Unidad":
+            unidad = st.text_input("Especifique Unidad", key="mant_unidad_otra")
         else:
-            foto_capturada = st.file_uploader("Selecciona la imagen desde tu dispositivo:", type=["jpg", "png", "jpeg"])
-
-        btn_guardar = st.form_submit_button("💾 GUARDAR MANTENIMIENTO Y FOTO", use_container_width=True)
+            unidad = unidad_sel
         
-        if btn_guardar:
-            if unidad.strip() == "":
-                st.error("⚠️ Debe especificar la unidad o camión.")
-            else:
+        tipo_trabajo = st.selectbox("Tipo de Mantenimiento / Cambio", [
+            "🛢️ Cambio de Aceite y Filtros",
+            "🔩 Cambio de Repuesto / Pieza Rota",
+            "🛞 Servicio de Neumáticos / Alineación",
+            "⚡ Reparación Eléctrica",
+            "🔨 Mantenimiento General / Taller",
+            "🧾 Comprobante / Factura de Compra"
+        ], key="mant_tipo")
+        
+        km_horas = st.number_input("Kilometraje actual u Horas de Motor", min_value=0, value=100000, step=500, key="mant_km")
+        
+    with col2:
+        mecanico = st.selectbox("Mecánico / Responsable", [
+            "Rocho (Mecánico)",
+            "Daniel (Mecánico)",
+            "Taller Externo",
+            "Otro"
+        ], key="mant_mecanico")
+        
+        repuestos_usados = st.text_input("Repuestos o Insumos Utilizados", placeholder="ej: Filtro Mann W950, Aceite 15W40 20L, etc.", key="mant_repuestos")
+        costo = st.number_input("Costo Aproximado / Factura ($)", min_value=0.0, value=0.0, step=100.0, key="mant_costo")
+        obs = st.text_area("Detalle / Observaciones del trabajo realizado", placeholder="Describa el estado de la pieza reemplazada o el motivo del cambio...", key="mant_obs")
+
+    st.divider()
+    st.markdown("### 📷 Adjuntar Foto / Evidencia Fotográfica")
+    
+    opcion_foto = st.radio("Método para cargar la foto:", ["📷 Sacar foto ahora (Cámara Celular/Webcam)", "📁 Cargar desde la Galería/Archivos"], horizontal=True, key="mant_metodo_foto")
+    
+    foto_capturada = None
+    if "Cámara" in opcion_foto:
+        foto_capturada = st.camera_input("Toma la foto del repuesto cambiado o factura:", key="mant_foto_cam")
+    else:
+        foto_capturada = st.file_uploader("Selecciona la imagen desde tu dispositivo:", type=["jpg", "png", "jpeg"], key="mant_foto_file")
+
+    st.markdown("---")
+    btn_guardar = st.button("💾 GUARDAR MANTENIMIENTO Y FOTO", use_container_width=True, type="primary")
+    
+    if btn_guardar:
+        if not unidad or unidad.strip() == "":
+            st.error("⚠️ Debe especificar la unidad o camión.")
+        else:
+            with st.spinner("Guardando registro y procesando imagen..."):
                 str_foto_base64 = convertir_imagen_a_base64(foto_capturada) if foto_capturada else ""
                 
                 try:
@@ -162,4 +182,4 @@ else:
                             st.info("Sin foto adjunta")
 
     except Exception as e:
-        st.error(f"Error al cargar la pestaña 'Mantenimientos_Fotos': {e}")
+        st.info("Aún no hay registros en la pestaña 'Mantenimientos_Fotos' o no se ha creado.")
