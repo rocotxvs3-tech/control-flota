@@ -22,7 +22,7 @@ try:
         secure = True
     )
 except Exception:
-    st.warning("⚠️ Asegúrate de agregar las credenciales de Cloudinary en los Secrets de Streamlit.")
+    st.warning("⚠️️ Asegúrate de agregar las credenciales de Cloudinary en los Secrets de Streamlit.")
 
 # ---------------------------------------------------------
 # LISTA OFICIAL DE VEHÍCULOS Y EQUIPOS DE LA FLOTA
@@ -57,7 +57,6 @@ menu = st.sidebar.radio("Navegación:", ["📸 Registrar Mantenimiento / Foto HD
 def subir_foto_alta_resolucion(file_buffer):
     if file_buffer is not None:
         try:
-            # Subida directa del archivo original sin perder calidad
             respuesta = cloudinary.uploader.upload(
                 file_buffer,
                 folder="mantenimientos_flota",
@@ -125,12 +124,6 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
         else:
             with st.spinner("Subiendo foto en alta resolución y guardando en planilla..."):
                 url_foto_hd = subir_foto_alta_resolucion(foto_capturada) if foto_capturada else ""
-                
-                # Formato de enlace limpio para Google Sheets
-                if url_foto_hd:
-                    enlace_sheets = f'=HYPERLINK("{url_foto_hd}"; "📷 Ver Foto {unidad}")'
-                else:
-                    enlace_sheets = "Sin foto"
 
                 try:
                     df_existente = conn.read(worksheet="Mantenimientos_Fotos", ttl=0)
@@ -144,7 +137,7 @@ if menu == "📸 Registrar Mantenimiento / Foto HD":
                     "Kilometraje/Horas": km_horas,
                     "Repuestos Utilizados": repuestos_usados,
                     "Mecánico/Responsable": mecanico,
-                    "Foto Evidencia": enlace_sheets,  # Enlace formateado amigable para Google Sheets
+                    "Foto Evidencia": url_foto_hd,  # URL directa y limpia
                     "Costo Aprox": costo,
                     "Observaciones": obs
                 }])
@@ -188,19 +181,11 @@ else:
                         st.markdown(f"**Observaciones:** {row['Observaciones']}")
                         
                     with c2:
-                        raw_foto = str(row.get("Foto Evidencia", ""))
-                        
-                        # Extraer URL si viene en formato =HYPERLINK("url"; "texto")
-                        url_foto = raw_foto
-                        if 'HYPERLINK("' in raw_foto:
-                            try:
-                                url_foto = raw_foto.split('HYPERLINK("')[1].split('"')[0]
-                            except Exception:
-                                url_foto = raw_foto
+                        url_foto = str(row.get("Foto Evidencia", "")).strip()
 
                         if pd.notna(url_foto) and url_foto.startswith("http"):
                             st.image(url_foto, caption=f"Foto HD ({row['Unidad']})", use_container_width=True)
-                            st.link_button("🔎 Ampliar / Descargar Foto HD", url_foto, use_container_width=True)
+                            st.link_button("🔎 Ampliar / Abrir Foto HD", url_foto, use_container_width=True)
                         else:
                             st.info("📷 Sin foto adjunta")
 
