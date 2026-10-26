@@ -1,36 +1,35 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+from openpyxl import load_workbook
+import os
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y CONEXIÓN
+# CONFIGURACIÓN DE PÁGINA
 # ---------------------------------------------------------
 st.set_page_config(page_title="Control de Rodados y Neumáticos - XIMA SRL", layout="wide", page_icon="🛞")
 
-# Conexión central con Google Sheets (usa la misma configuración de tus secrets)
-conn = st.connection("gsheets", type=GSheetsConnection)
+EXCEL_PATH = "CONTROL DE RODADOS XIMA SRL 2026.xlsx"
 
 st.title("🛞 Control de Rodados y Gestión de Neumáticos - XIMA SRL")
-st.markdown("Sistema vinculado a Google Sheets para actualización de cubiertas y bitácora histórica.")
+st.markdown("Gestión de cubiertas y bitácora histórica basada en archivos Excel (`.xlsx`).")
 
-# Lista de solapas correspondientes a cada unidad en tu Google Sheet
-hojas_vehiculos = [
-    "ATEGO AH395LS",
-    "ACTROS AG506KW",
-    "1735 AB032RM",
-    "1735 AB020RG",
-    "IVECO AG096CP",
-    "IVECO AC737ZZ",
-    "TOLVA AC738FC",
-    "TOLVA AF720XG",
-    "BATEA AC738HC",
-    "SEMI AC116DF"
-]
+# Verificar si el archivo Excel existe
+if not os.path.exists(EXCEL_PATH):
+    st.error(f"⚠️ No se encuentra el archivo '{EXCEL_PATH}' en el repositorio. Asegúrate de subirlo junto con app_rodados.py.")
+    st.stop()
+
+# Cargar las solapas del archivo Excel
+try:
+    xls = pd.ExcelFile(EXCEL_PATH)
+    hojas_vehiculos = [h for h in xls.sheet_names if h not in ["Hoja1", "Historial_Cambios"]]
+except Exception as e:
+    st.error(f"❌ Error al leer el archivo Excel: {e}")
+    st.stop()
 
 menu = st.sidebar.radio("Navegación:", [
     "🛠️ Ver / Modificar Neumáticos por Unidad", 
-    "📊 Historial de Cambios"
+    "📊 Historial de Cambios y Descarga"
 ])
 
 # ---------------------------------------------------------
@@ -42,16 +41,14 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
     unidad_seleccionada = st.selectbox("Seleccione Unidad / Vehículo:", hojas_vehiculos)
     
     try:
-        # Leer la solapa correspondiente desde Google Sheets
-        df_unidad = conn.read(worksheet=unidad_seleccionada, ttl=0)
+        # Leer la solapa del vehículo seleccionado
+        df_unidad = pd.read_excel(EXCEL_PATH, sheet_name=unidad_seleccionada, header=None)
         
         st.markdown(f"### 🚛 Unidad: **{unidad_seleccionada}**")
-        
-        # Mostrar la planilla actual de la unidad
         st.dataframe(df_unidad, use_container_width=True)
 
     except Exception as e:
-        st.warning(f"⚠️ No se pudo leer la solapa '{unidad_seleccionada}'. Verifica que exista exactamente con ese nombre en tu Google Sheet.")
+        st.error(f"⚠️ Error al leer la solapa '{unidad_seleccionada}': {e}")
 
     st.markdown("---")
     st.markdown("### ✍️ Registrar Cambio o Recambio de Cubierta")
@@ -89,61 +86,65 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
         obs_cambio = st.text_input("Observaciones breves:", placeholder="ej: Se alinea el tren delantero", key="rod_obs")
 
     st.divider()
-    btn_guardar_cambio = st.button("💾 GUARDAR CAMBIO Y ACTUALIZAR HISTORIAL", type="primary", use_container_width=True)
+    btn_guardar_cambio = st.button("💾 GUARDAR CAMBIO EN EL EXCEL", type="primary", use_container_width=True)
 
     if btn_guardar_cambio:
         if not cod_nuevo or cod_nuevo.strip() == "":
             st.warning("⚠️ Debe ingresar el código interno del nuevo neumático.")
         else:
-            with st.spinner("Registrando cambio en Google Sheets..."):
+            with st.spinner("Actualizando archivo Excel..."):
                 try:
-                    # 1. Leer o inicializar la solapa de Historial_Cambios
-                    try:
-                        df_hist = conn.read(worksheet="Historial_Cambios", ttl=0)
-                    except Exception:
-                        df_hist = pd.DataFrame(columns=[
+                    # Abrir el libro con openpyxl para conservar todas las solapas y formato original
+                    wb = load_workbook(EXCEL_PATH)
+                    
+                    # 1. Verificar o crear la hoja de Historial
+                    if "Historial_Cambios" not in wb.sheetnames:
+                        ws_hist = wb.create_sheet("Historial_Cambios")
+                        ws_hist.append([
                             "Fecha", "Unidad", "Posición", "Código Anterior", 
                             "Código Nuevo", "Marca / Modelo", "Kilometraje", 
                             "Motivo", "Responsable", "Observaciones"
                         ])
-
-                    # 2. Crear la nueva fila de historial
-                    nueva_fila = pd.DataFrame([{
-                        "Fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "Unidad": unidad_seleccionada,
-                        "Posición": posicion,
-                        "Código Anterior": cod_anterior if cod_anterior else "N/D",
-                        "Código Nuevo": cod_nuevo,
-                        "Marca / Modelo": marca_modelo if marca_modelo else "N/D",
-                        "Kilometraje": kilometraje,
-                        "Motivo": motivo,
-                        "Responsable": responsable,
-                        "Observaciones": obs_cambio
-                    }])
-
-                    # 3. Actualizar la solapa 'Historial_Cambios' en Google Sheets
-                    df_actualizado = pd.concat([df_hist, nueva_fila], ignore_index=True)
-                    conn.update(worksheet="Historial_Cambios", data=df_actualizado)
-
-                    st.success(f"✅ ¡Cambio registrado con éxito para **{unidad_seleccionada}** ({posicion}) y guardado en Google Sheets!")
+                    else:
+                        ws_hist = wb["Historial_Cambios"]
+                    
+                    # 2. Agregar la nueva fila al historial
+                    fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    ws_hist.append([
+                        fecha_actual,
+                        unidad_seleccionada,
+                        posicion,
+                        cod_anterior if cod_anterior else "N/D",
+                        cod_nuevo,
+                        marca_modelo if marca_modelo else "N/D",
+                        kilometraje,
+                        motivo,
+                        responsable,
+                        obs_cambio
+                    ])
+                    
+                    # 3. Guardar cambios en el archivo físico
+                    wb.save(EXCEL_PATH)
+                    
+                    st.success(f"✅ ¡Cambio registrado con éxito para **{unidad_seleccionada}** y guardado en el archivo Excel!")
                     st.cache_data.clear()
 
                 except Exception as e:
-                    st.error(f"❌ Error al actualizar Google Sheets: {e}")
+                    st.error(f"❌ Error al modificar el archivo Excel: {e}")
 
 # ---------------------------------------------------------
-# OPCIÓN 2: VER HISTORIAL DE CAMBIOS
+# OPCIÓN 2: VER HISTORIAL Y DESCARGAR EXCEL ACTUALIZADO
 # ---------------------------------------------------------
 else:
-    st.subheader("📊 Historial General de Cambios de Neumáticos")
+    st.subheader("📊 Historial de Cambios y Descarga de Planilla")
     
     if st.button("🔄 Actualizar Registros"):
         st.cache_data.clear()
         st.rerun()
 
     try:
-        # Leer el historial desde Google Sheets
-        df_historial = conn.read(worksheet="Historial_Cambios", ttl=0)
+        # Leer la solapa de historial directamente del archivo Excel
+        df_historial = pd.read_excel(EXCEL_PATH, sheet_name="Historial_Cambios")
         
         if df_historial.empty:
             st.info("Aún no hay registros en el historial de cambios.")
@@ -157,4 +158,18 @@ else:
             st.dataframe(df_filtrado.iloc[::-1], use_container_width=True)
 
     except Exception:
-        st.info("Aún no se ha creado la pestaña 'Historial_Cambios' en tu Google Sheet. Realiza tu primer registro de cambio para generarla automáticamente.")
+        st.info("Aún no se ha generado la solapa 'Historial_Cambios'. Realiza tu primer registro en la pestaña anterior para generarla automáticamente.")
+
+    st.markdown("---")
+    st.markdown("### 📥 Descargar Planilla Completa Actualizada")
+    st.markdown("Puedes descargar el archivo `.xlsx` con todas las modificaciones y el historial integrado en cualquier momento:")
+    
+    if os.path.exists(EXCEL_PATH):
+        with open(EXCEL_PATH, "rb") as f:
+            st.download_button(
+                label="📥 DESCARGAR EXCEL ACTUALIZADO",
+                data=f,
+                file_name="CONTROL_DE_RODADOS_XIMA_ACTUALIZADO.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
