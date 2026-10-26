@@ -11,7 +11,7 @@ st.set_page_config(page_title="Control de Rodados y Neumáticos - XIMA SRL", lay
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("🛞 Control de Rodados y Gestión de Neumáticos - XIMA SRL")
-st.markdown("Sistema sincronizado en tiempo real con Google Drive (Actualiza la unidad y el historial automáticamente).")
+st.markdown("Sistema sincronizado con Google Drive para control de flota e historial.")
 
 # Lista exacta de solapas (vehículos) en tu Google Sheet
 hojas_vehiculos = [
@@ -28,20 +28,20 @@ hojas_vehiculos = [
 ]
 
 menu = st.sidebar.radio("Navegación:", [
-    "🛠️ Ver / Modificar Neumáticos por Unidad", 
+    "🛠️ Ver / Registrar Cambio de Neumático", 
     "📊 Historial de Cambios en Google Drive"
 ])
 
 # ---------------------------------------------------------
-# OPCIÓN 1: MODIFICAR Y GESTIONAR NEUMÁTICOS POR UNIDAD
+# OPCIÓN 1: VER Y REGISTRAR CAMBIO
 # ---------------------------------------------------------
-if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
+if menu == "🛠️ Ver / Registrar Cambio de Neumático":
     st.subheader("📋 Planilla de Rodados por Unidad")
     
     unidad_seleccionada = st.selectbox("Seleccione Unidad / Vehículo:", hojas_vehiculos)
     
     try:
-        # Leer la solapa del vehículo seleccionado desde Google Sheets
+        # Leer la solapa del vehículo seleccionado desde Google Sheets (solo lectura para ver el estado actual)
         df_unidad = conn.read(worksheet=unidad_seleccionada, ttl=0)
         
         st.markdown(f"### 🚛 Unidad: **{unidad_seleccionada}**")
@@ -49,7 +49,6 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
 
     except Exception as e:
         st.error(f"⚠️ No se pudo leer la solapa '{unidad_seleccionada}': {e}")
-        st.info("💡 Asegúrate de que la pestaña en tu Google Sheet se llame exactamente igual.")
         st.stop()
 
     st.markdown("---")
@@ -58,8 +57,7 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
     col1, col2 = st.columns(2)
     
     with col1:
-        # Posiciones basadas en el esquema de tus planillas
-        posicion = st.selectbox("Posición del Neumático a Modificar:", [
+        posicion = st.selectbox("Posición del Neumático:", [
             "Auxilio",
             "Eje Delantero - Lado Izquierdo",
             "Eje Delantero - Lado Derecho",
@@ -75,7 +73,7 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
         
     with col2:
         marca_modelo = st.text_input("Marca y Modelo:", placeholder="ej: FATE 1425 / Recauchutada", key="rod_marca")
-        kilometraje = st.number_input("Kilometraje actual de la cubierta/unidad:", min_value=0, value=100000, step=500, key="rod_km")
+        kilometraje = st.number_input("Kilometraje actual de la unidad:", min_value=0, value=100000, step=500, key="rod_km")
         
         motivo = st.selectbox("Motivo del cambio:", [
             "Desgaste normal",
@@ -90,55 +88,15 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
         obs_cambio = st.text_input("Observaciones breves:", placeholder="ej: Se alinea el tren delantero", key="rod_obs")
 
     st.divider()
-    btn_guardar_cambio = st.button("💾 ACTUALIZAR PLANILLA Y GUARDAR EN GOOGLE DRIVE", type="primary", use_container_width=True)
+    btn_guardar_cambio = st.button("💾 REGISTRAR CAMBIO EN EL HISTORIAL DE DRIVE", type="primary", use_container_width=True)
 
     if btn_guardar_cambio:
         if not cod_nuevo or cod_nuevo.strip() == "":
             st.warning("⚠️ Debe ingresar el código interno del nuevo neumático.")
         else:
-            with st.spinner("Actualizando planilla del camión y registrando historial en Google Drive..."):
+            with st.spinner("Guardando registro en Google Drive..."):
                 try:
-                    # 1. ACTUALIZAR LAS CELDAS EN LA PLANILLA DEL VEHÍCULO
-                    # Mapeo de filas/columnas según la estructura fija de tus planillas de rodados:
-                    # - Auxilio: Fila 1 (Marca), Fila 3 (Cód), Fila 4 (Kilom) en col 2
-                    # - Eje Delantero Izq: Fila 6 (Marca), Fila 8 (Cód), Fila 9 (Kilom) en col 2
-                    # - Eje Delantero Der: Fila 6 (Marca), Fila 8 (Cód), Fila 9 (Kilom) en col 7
-                    # - Eje Tracción Izq Ext: Fila 11 (Marca), Fila 13 (Cód), Fila 14 (Kilom) en col 2
-                    # - Eje Tracción Izq Int: Fila 11 (Marca), Fila 13 (Cód), Fila 14 (Kilom) en col 4
-                    # - Eje Tracción Der Int: Fila 11 (Marca), Fila 13 (Cód), Fila 14 (Kilom) en col 5
-                    # - Eje Tracción Der Ext: Fila 11 (Marca), Fila 13 (Cód), Fila 14 (Kilom) en col 7
-                    
-                    r_marca, r_cod, r_km, col_idx = 1, 3, 4, 2 # Por defecto Auxilio
-                    
-                    if "Delantero - Lado Izquierdo" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 6, 8, 9, 2
-                    elif "Delantero - Lado Derecho" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 6, 8, 9, 7
-                    elif "Tracción - Izq. Exterior" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 11, 13, 14, 2
-                    elif "Tracción - Izq. Interior" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 11, 13, 14, 4
-                    elif "Tracción - Der. Interior" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 11, 13, 14, 5
-                    elif "Tracción - Der. Exterior" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 11, 13, 14, 7
-                    elif "Balancín" in posicion:
-                        r_marca, r_cod, r_km, col_idx = 16, 18, 19, 2
-
-                    # Aplicar la modificación en el DataFrame del vehículo si las dimensiones lo permiten
-                    if df_unidad.shape[0] > r_km and df_unidad.shape[1] > col_idx:
-                        df_unidad.iat[r_marca, col_idx] = f"Marca: {marca_modelo}"
-                        df_unidad.iat[r_cod, col_idx] = f"Cód.: {cod_nuevo}"
-                        df_unidad.iat[r_km, col_idx] = f"Kilom.: {kilometraje}"
-                        
-                        # Actualizar observaciones generales en la parte baja si se ingresó algo
-                        if obs_cambio and df_unidad.shape[0] > 24:
-                            df_unidad.iat[24, 1] = f"OBSERVACIONES: {obs_cambio} (Ref: {posicion} - {datetime.now().strftime('%d/%m/%Y')})"
-
-                        # Enviar la planilla del camión actualizada a Google Drive
-                        conn.update(worksheet=unidad_seleccionada, data=df_unidad)
-
-                    # 2. REGISTRAR EN LA SOLAPA DE HISTORIAL_CAMBIOS
+                    # Leer o inicializar la solapa de Historial_Cambios en Google Sheets
                     try:
                         df_hist = conn.read(worksheet="Historial_Cambios", ttl=0)
                     except Exception:
@@ -148,6 +106,7 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
                             "Motivo", "Responsable", "Observaciones"
                         ])
 
+                    # Crear la nueva fila de historial
                     nueva_fila = pd.DataFrame([{
                         "Fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
                         "Unidad": unidad_seleccionada,
@@ -162,13 +121,15 @@ if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
                     }])
 
                     df_actualizado = pd.concat([df_hist, nueva_fila], ignore_index=True)
+                    
+                    # Guardar ordenadamente en la solapa Historial_Cambios sin alterar el diseño de los camiones
                     conn.update(worksheet="Historial_Cambios", data=df_actualizado)
 
-                    st.success(f"✅ ¡Modificación aplicada en la planilla de **{unidad_seleccionada}** y registrada en el historial de Google Drive!")
+                    st.success(f"✅ ¡Cambio registrado con éxito en el historial de Google Drive para **{unidad_seleccionada}** ({posicion})!")
                     st.cache_data.clear()
 
                 except Exception as e:
-                    st.error(f"❌ Error al actualizar Google Drive: {e}")
+                    st.error(f"❌ Error al guardar en Google Drive: {e}")
 
 # ---------------------------------------------------------
 # OPCIÓN 2: VER HISTORIAL DESDE GOOGLE DRIVE
@@ -195,4 +156,4 @@ else:
             st.dataframe(df_filtrado.iloc[::-1], use_container_width=True)
 
     except Exception:
-        st.info("Aún no se ha creado la pestaña 'Historial_Cambios' en tu Google Sheet. Realiza tu primer registro en la pestaña anterior para generarla automáticamente en Drive.")
+        st.info("Aún no se ha creado la pestaña 'Historial_Cambios' en tu Google Sheet. Créala en tu Google Sheet con los encabezados correspondientes para comenzar.")
