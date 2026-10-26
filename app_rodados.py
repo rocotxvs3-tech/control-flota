@@ -1,169 +1,160 @@
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook
 from datetime import datetime
-import os
+from streamlit_gsheets import GSheetsConnection
 
 # ---------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA
+# CONFIGURACIÓN DE PÁGINA Y CONEXIÓN
 # ---------------------------------------------------------
-st.set_page_config(page_title="Control de Rodados y Neumáticos", layout="wide", page_icon="🛞")
+st.set_page_config(page_title="Control de Rodados y Neumáticos - XIMA SRL", layout="wide", page_icon="🛞")
 
-EXCEL_FILE = "CONTROL DE RODADOS XIMA SRL 2026.xlsx"
+# Conexión central con Google Sheets (usa la misma configuración de tus secrets)
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("🛞 Módulo Independiente de Control de Rodados y Neumáticos")
-st.markdown("Gestión de cambios, rotaciones e historial de cubiertas por unidad.")
+st.title("🛞 Control de Rodados y Gestión de Neumáticos - XIMA SRL")
+st.markdown("Sistema vinculado a Google Sheets para actualización de cubiertas y bitácora histórica.")
 
-# Verificar si el archivo Excel existe
-if not os.path.exists(EXCEL_FILE):
-    st.error(f"❌ No se encontró el archivo '{EXCEL_FILE}' en el directorio del proyecto. Por favor, asegúrate de subirlo.")
-    st.stop()
-
-# Cargar nombres de las hojas (unidades)
-xls = pd.ExcelFile(EXCEL_FILE)
-unidades_hojas = [h for h in xls.sheet_names if h != "Hoja1" and h != "Historial_Cambios"]
+# Lista de solapas correspondientes a cada unidad en tu Google Sheet
+hojas_vehiculos = [
+    "ATEGO AH395LS",
+    "ACTROS AG506KW",
+    "1735 AB032RM",
+    "1735 AB020RG",
+    "IVECO AG096CP",
+    "IVECO AC737ZZ",
+    "TOLVA AC738FC",
+    "TOLVA AF720XG",
+    "BATEA AC738HC",
+    "SEMI AC116DF"
+]
 
 menu = st.sidebar.radio("Navegación:", [
-    "📝 Registrar Cambio / Rotación de Neumático", 
-    "📊 Ver Historial de Cambios",
-    "🔍 Consultar Estado Actual de Unidad"
+    "🛠️ Ver / Modificar Neumáticos por Unidad", 
+    "📊 Historial de Cambios"
 ])
 
 # ---------------------------------------------------------
-# OPCIÓN 1: REGISTRAR CAMBIO O ROTACIÓN
+# OPCIÓN 1: MODIFICAR Y GESTIONAR NEUMÁTICOS POR UNIDAD
 # ---------------------------------------------------------
-if menu == "📝 Registrar Cambio / Rotación de Neumático":
-    st.subheader("🔄 Registrar Movimiento de Neumático")
+if menu == "🛠️ Ver / Modificar Neumáticos por Unidad":
+    st.subheader("📋 Planilla de Rodados por Unidad")
+    
+    unidad_seleccionada = st.selectbox("Seleccione Unidad / Vehículo:", hojas_vehiculos)
+    
+    try:
+        # Leer la solapa correspondiente desde Google Sheets
+        df_unidad = conn.read(worksheet=unidad_seleccionada, ttl=0)
+        
+        st.markdown(f"### 🚛 Unidad: **{unidad_seleccionada}**")
+        
+        # Mostrar la planilla actual de la unidad
+        st.dataframe(df_unidad, use_container_width=True)
+
+    except Exception as e:
+        st.warning(f"⚠️ No se pudo leer la solapa '{unidad_seleccionada}'. Verifica que exista exactamente con ese nombre en tu Google Sheet.")
+
+    st.markdown("---")
+    st.markdown("### ✍️ Registrar Cambio o Recambio de Cubierta")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        unidad_sel = st.selectbox("Seleccionar Unidad / Camión:", unidades_hojas, key="rod_unidad")
         posicion = st.selectbox("Posición del Neumático:", [
-            "Eje Delantero Izquierdo",
-            "Eje Delantero Derecho",
-            "Eje Tracción Ext. Izquierdo",
-            "Eje Tracción Int. Izquierdo",
-            "Eje Tracción Int. Derecho",
-            "Eje Tracción Ext. Derecho",
-            "Eje Neumático / Balancín Izq.",
-            "Eje Neumático / Balancín Der.",
+            "Eje Delantero - Izquierdo",
+            "Eje Delantero - Derecho",
+            "Eje Tracción - Izquierdo Ext.",
+            "Eje Tracción - Izquierdo Int.",
+            "Eje Tracción - Derecho Int.",
+            "Eje Tracción - Derecho Ext.",
+            "Balancín / Eje Neumático",
             "Auxilio"
         ], key="rod_pos")
         
-        km_actual = st.number_input("Kilometraje / Horas de la Unidad:", min_value=0, value=120000, step=500, key="rod_km")
-
-    with col2:
-        codigo_anterior = st.text_input("Código / Interno Neumático que se SACA:", placeholder="ej: INT 166", key="rod_ant")
-        codigo_nuevo = st.text_input("Código / Interno Neumático que se COLOCA:", placeholder="ej: INT 180", key="rod_nue")
-        marca_modelo = st.text_input("Marca y Modelo:", placeholder="ej: Fate / Pirelli / Bridgestone", key="rod_marca")
+        cod_anterior = st.text_input("Código Interno Anterior (ej: INT 166):", key="rod_cod_ant")
+        cod_nuevo = st.text_input("Código Interno Nuevo (ej: INT 180):", key="rod_cod_nuevo")
         
-        motivo = st.selectbox("Motivo del Cambio:", [
-            "Desgaste / Fin de Vida Útil",
-            "Rotura / Pinchadura",
+    with col2:
+        marca_modelo = st.text_input("Marca y Modelo:", placeholder="ej: FATE 1425 / Recauchutada", key="rod_marca")
+        kilometraje = st.number_input("Kilometraje actual de la unidad:", min_value=0, value=100000, step=500, key="rod_km")
+        motivo = st.selectbox("Motivo del cambio:", [
+            "Desgaste normal",
+            "Pinchadura / Rotura",
+            "Rotación entre ejes",
             "Recauche",
-            "Rotación Programada entre Ejes",
-            "Uso de Auxilio"
+            "Auxilio utilizado",
+            "Otro"
         ], key="rod_motivo")
         
-        responsable = st.selectbox("Responsable / Mecánico:", [
-            "Franco Luna",
-            "Rocho",
-            "Daniel",
-            "Taller Externo"
-        ], key="rod_resp")
-        
-        obs = st.text_area("Observaciones adicionales:", placeholder="Detalles de la maniobra...", key="rod_obs")
+        responsable = st.text_input("Responsable del registro:", value="Franco Luna", key="rod_resp")
+        obs_cambio = st.text_input("Observaciones breves:", placeholder="ej: Se alinea el tren delantero", key="rod_obs")
 
     st.divider()
-    if st.button("💾 GUARDAR CAMBIO EN EL SISTEMA", type="primary", use_container_width=True):
-        if not codigo_anterior or not codigo_nuevo:
-            st.warning("⚠️ Debe especificar el código del neumático anterior y del nuevo.")
-        else:
-            try:
-                wb = load_workbook(EXCEL_FILE)
-                
-                # 1. Asegurar que existe la hoja Historial_Cambios
-                if "Historial_Cambios" not in wb.sheetnames:
-                    ws_hist = wb.create_sheet("Historial_Cambios")
-                    ws_hist.append([
-                        "Fecha", "Unidad", "Posición", "Código Anterior", 
-                        "Código Nuevo", "Marca / Modelo", "Kilometraje", 
-                        "Motivo", "Responsable", "Observaciones"
-                    ])
-                else:
-                    ws_hist = wb["Historial_Cambios"]
-                
-                # 2. Agregar registro al historial
-                fecha_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
-                ws_hist.append([
-                    fecha_actual,
-                    unidad_sel,
-                    posicion,
-                    codigo_anterior,
-                    codigo_nuevo,
-                    marca_modelo,
-                    km_actual,
-                    motivo,
-                    responsable,
-                    obs
-                ])
-                
-                wb.save(EXCEL_FILE)
-                st.success(f"✅ ¡Cambio registrado correctamente para la unidad **{unidad_sel}** en la posición **{posicion}**!")
-                st.info("💡 El historial se ha actualizado en la bitácora central.")
+    btn_guardar_cambio = st.button("💾 GUARDAR CAMBIO Y ACTUALIZAR HISTORIAL", type="primary", use_container_width=True)
 
-            except Exception as e:
-                st.error(f"❌ Error al actualizar el archivo Excel: {e}")
+    if btn_guardar_cambio:
+        if not cod_nuevo or cod_nuevo.strip() == "":
+            st.warning("⚠️ Debe ingresar el código interno del nuevo neumático.")
+        else:
+            with st.spinner("Registrando cambio en Google Sheets..."):
+                try:
+                    # 1. Leer o inicializar la solapa de Historial_Cambios
+                    try:
+                        df_hist = conn.read(worksheet="Historial_Cambios", ttl=0)
+                    except Exception:
+                        df_hist = pd.DataFrame(columns=[
+                            "Fecha", "Unidad", "Posición", "Código Anterior", 
+                            "Código Nuevo", "Marca / Modelo", "Kilometraje", 
+                            "Motivo", "Responsable", "Observaciones"
+                        ])
+
+                    # 2. Crear la nueva fila de historial
+                    nueva_fila = pd.DataFrame([{
+                        "Fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "Unidad": unidad_seleccionada,
+                        "Posición": posicion,
+                        "Código Anterior": cod_anterior if cod_anterior else "N/D",
+                        "Código Nuevo": cod_nuevo,
+                        "Marca / Modelo": marca_modelo if marca_modelo else "N/D",
+                        "Kilometraje": kilometraje,
+                        "Motivo": motivo,
+                        "Responsable": responsable,
+                        "Observaciones": obs_cambio
+                    }])
+
+                    # 3. Actualizar la solapa 'Historial_Cambios' en Google Sheets
+                    df_actualizado = pd.concat([df_hist, nueva_fila], ignore_index=True)
+                    conn.update(worksheet="Historial_Cambios", data=df_actualizado)
+
+                    st.success(f"✅ ¡Cambio registrado con éxito para **{unidad_seleccionada}** ({posicion}) y guardado en Google Sheets!")
+                    st.cache_data.clear()
+
+                except Exception as e:
+                    st.error(f"❌ Error al actualizar Google Sheets: {e}")
 
 # ---------------------------------------------------------
 # OPCIÓN 2: VER HISTORIAL DE CAMBIOS
 # ---------------------------------------------------------
-elif menu == "📊 Ver Historial de Cambios":
-    st.subheader("📜 Historial General de Movimientos de Neumáticos")
+else:
+    st.subheader("📊 Historial General de Cambios de Neumáticos")
     
-    if st.button("🔄 Actualizar Historial"):
+    if st.button("🔄 Actualizar Registros"):
         st.cache_data.clear()
         st.rerun()
 
     try:
-        # Leer la hoja de historial directamente con pandas
-        df_hist = pd.read_excel(EXCEL_FILE, sheet_name="Historial_Cambios")
+        # Leer el historial desde Google Sheets
+        df_historial = conn.read(worksheet="Historial_Cambios", ttl=0)
         
-        if df_hist.empty:
+        if df_historial.empty:
             st.info("Aún no hay registros en el historial de cambios.")
         else:
-            # Filtro por unidad
-            unidades_disponibles = ["Todas"] + list(df_hist["Unidad"].dropna().unique())
-            filtro_hist_u = st.selectbox("Filtrar Historial por Unidad:", unidades_disponibles)
+            unidades_hist = ["Todas"] + list(df_historial["Unidad"].unique())
+            filtro_h = st.selectbox("Filtrar historial por Unidad:", unidades_hist)
             
-            df_mostrar = df_hist if filtro_hist_u == "Todas" else df_hist[df_hist["Unidad"] == filtro_hist_u]
+            df_filtrado = df_historial if filtro_h == "Todas" else df_historial[df_historial["Unidad"] == filtro_h]
             
-            st.dataframe(df_mostrar.iloc[::-1], use_container_width=True)
-            
-            # Botón para descargar el historial actualizado
-            with open(EXCEL_FILE, "rb") as file:
-                st.download_button(
-                    label="📥 Descargar Planilla Completa Actualizada (.xlsx)",
-                    data=file,
-                    file_name="CONTROL_DE_RODADOS_ACTUALIZADO.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.markdown(f"Mostrando **{len(df_filtrado)}** registros de cambios:")
+            st.dataframe(df_filtrado.iloc[::-1], use_container_width=True)
 
     except Exception:
-        st.info("Aún no se ha generado la pestaña 'Historial_Cambios' en el archivo Excel. Realiza tu primer registro para crearla automáticamente.")
-
-# ---------------------------------------------------------
-# OPCIÓN 3: CONSULTAR ESTADO DE UNIDAD
-# ---------------------------------------------------------
-else:
-    st.subheader("🔍 Consultar Estructura y Datos de Unidad")
-    
-    unidad_consulta = st.selectbox("Seleccione Unidad a Inspeccionar:", unidades_hojas, key="cons_unidad")
-    
-    try:
-        df_unidad = pd.read_excel(EXCEL_FILE, sheet_name=unidad_consulta, header=None)
-        st.markdown(f"### Vista de la Hoja: `{unidad_consulta}`")
-        st.dataframe(df_unidad, use_container_width=True)
-    except Exception as e:
-        st.error(f"No se pudo cargar la hoja de la unidad: {e}")
+        st.info("Aún no se ha creado la pestaña 'Historial_Cambios' en tu Google Sheet. Realiza tu primer registro de cambio para generarla automáticamente.")
